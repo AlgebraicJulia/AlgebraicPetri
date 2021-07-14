@@ -183,6 +183,7 @@ Note that this returns an index if labels are not present in the PetriNet
 """
 tname(p::AbstractPetriNet,t) = (1:nt(p))[t]
 
+
 """ Names of species in  a Petri net
 
 Note that this returns indices if labels are not present in the PetriNet
@@ -258,8 +259,11 @@ passed to the DifferentialEquations.jl solver package.
 vectorfield(pn::AbstractPetriNet) = begin
   tm = TransitionMatrices(pn)
   dt = tm.output - tm.input
+  rates = zeros(Float64,nt(pn))
   f(du,u,p,t) = begin
-    rates = zeros(eltype(du),nt(pn))
+    if eltype(du) != Float64
+      rates = zeros(eltype(du), nt(pn))
+    end
     u_m = [u[sname(pn, i)] for i in 1:ns(pn)]
     p_m = [p[tname(pn, i)] for i in 1:nt(pn)]
     for i in 1:nt(pn)
@@ -490,7 +494,7 @@ end
 
 LabelledReactionNet{R,C}(pn::AbstractPetriNet, s_labels, t_labels, concentrations, rates) where {R, C} = begin
   pn′ = LabelledReactionNet{R,C}()
-  copy_parts!(pn′, pn)
+  copy_parts!(pn′, PetriNet(pn))
   map(k->set_subpart!(pn′, k, :sname, s_labels[k]), keys(s_labels))
   map(k->set_subpart!(pn′, k, :tname, t_labels[k]), keys(t_labels))
   map(k->set_subpart!(pn′, k, :concentration, concentrations[k]), keys(concentrations))
@@ -500,12 +504,14 @@ end
 
 LabelledReactionNet{R,C}(pn::Union{AbstractPetriNet}, states, transitions) where {R, C} = begin
   pn′ = LabelledReactionNet{R,C}()
-  copy_parts!(pn′, pn)
-  for (i, (k, v)) in enumerate(states)
+  copy_parts!(pn′, PetriNet(pn))
+  states = typeof(states) <: LArray ? [(k=>states[k]) for k ∈ keys(states)] : states
+  transitions = typeof(transitions) <: LArray ? [(k=>transitions[k]) for k ∈ keys(transitions)] : transitions
+  for (i, (k,v)) in enumerate(states)
     set_subpart!(pn′, i, :sname, k)
     set_subpart!(pn′, i, :concentration, v)
   end
-  for (i, (k, v)) in enumerate(transitions)
+  for (i, (k,v)) in enumerate(transitions)
     set_subpart!(pn′, i, :tname, k)
     set_subpart!(pn′, i, :rate, v)
   end
